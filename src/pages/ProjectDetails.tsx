@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,89 +9,149 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 const ProjectDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [bidAmount, setBidAmount] = useState('');
   const [bidDescription, setBidDescription] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
 
-  // Mock project data - replace with actual data from Supabase
-  const project = {
-    id: 1,
-    title: 'E-commerce Website Development',
-    description: `Looking for a skilled developer to build a modern e-commerce website with the following requirements:
+  // Fetch project details
+  const { data: project, isLoading: projectLoading } = useQuery({
+    queryKey: ['project', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          profiles:client_id (
+            first_name,
+            last_name,
+            avatar_url,
+            location
+          )
+        `)
+        .eq('id', id)
+        .single();
 
-    - Responsive design that works on all devices
-    - Product catalog with search and filtering
-    - Shopping cart and checkout functionality
-    - Payment integration (Stripe/PayPal)
-    - Admin panel for inventory management
-    - User authentication and profiles
-    - Order tracking system
-    - SEO optimization
-
-    The design should be modern, clean, and user-friendly. We have wireframes ready and will provide all necessary assets.
-
-    Please include examples of similar projects in your proposal.`,
-    budget: '$1,500-$3,000',
-    budgetType: 'fixed',
-    timeframe: '2-3 months',
-    location: 'Remote',
-    skills: ['React', 'Node.js', 'MongoDB', 'Stripe', 'AWS'],
-    proposals: 15,
-    postedDate: '2 days ago',
-    category: 'Web Development',
-    client: {
-      name: 'TechCorp Solutions',
-      avatar: '/placeholder.svg',
-      rating: 4.8,
-      reviews: 23,
-      location: 'United States',
-      memberSince: 'January 2022',
-      totalSpent: '$50,000+',
-      projectsPosted: 45
+      if (error) throw error;
+      return data;
     }
-  };
+  });
 
-  const proposals = [
-    {
-      id: 1,
-      freelancer: {
-        name: 'Sarah Johnson',
-        avatar: '/placeholder.svg',
-        rating: 4.9,
-        reviews: 127,
-        location: 'United States'
-      },
-      bidAmount: 2500,
-      deliveryTime: '6 weeks',
-      description: 'I have 5+ years of experience building e-commerce websites with React and Node.js. I can deliver exactly what you need.',
-      submittedDate: '1 day ago'
+  // Fetch proposals for this project
+  const { data: proposals = [] } = useQuery({
+    queryKey: ['proposals', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select(`
+          *,
+          profiles:freelancer_id (
+            first_name,
+            last_name,
+            avatar_url,
+            location
+          )
+        `)
+        .eq('project_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Submit proposal mutation
+  const submitProposalMutation = useMutation({
+    mutationFn: async (proposalData: {
+      project_id: string;
+      freelancer_id: string;
+      cover_letter: string;
+      proposed_budget: number;
+      delivery_time: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('proposals')
+        .insert([proposalData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     },
-    {
-      id: 2,
-      freelancer: {
-        name: 'Ahmed Hassan',
-        avatar: '/placeholder.svg',
-        rating: 4.8,
-        reviews: 94,
-        location: 'Egypt'
-      },
-      bidAmount: 1800,
-      deliveryTime: '8 weeks',
-      description: 'I specialize in e-commerce development and have built 20+ similar projects. I offer competitive pricing and quality work.',
-      submittedDate: '2 days ago'
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['proposals', id] });
+      toast.success('Proposal submitted successfully!');
+      setBidAmount('');
+      setBidDescription('');
+      setDeliveryTime('');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to submit proposal');
     }
-  ];
+  });
 
   const handleSubmitProposal = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Proposal submitted:', { bidAmount, bidDescription, deliveryTime });
-    // TODO: Implement Supabase proposal submission
+    
+    if (!user) {
+      toast.error('Please login to submit a proposal');
+      navigate('/login');
+      return;
+    }
+
+    if (!bidAmount || !bidDescription || !deliveryTime) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    submitProposalMutation.mutate({
+      project_id: id!,
+      freelancer_id: user.id,
+      cover_letter: bidDescription,
+      proposed_budget: parseFloat(bidAmount),
+      delivery_time: parseInt(deliveryTime)
+    });
   };
+
+  if (projectLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">Loading project details...</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">Project not found</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const budgetDisplay = project.budget_min && project.budget_max 
+    ? `$${project.budget_min}-$${project.budget_max}`
+    : project.budget_min 
+    ? `$${project.budget_min}+`
+    : 'Budget not specified';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,19 +171,21 @@ const ProjectDetails = () => {
                       <div className="flex items-center gap-6 text-sm text-gray-600 mb-4">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4" />
-                          {project.budget}
+                          {budgetDisplay}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {project.timeframe}
-                        </div>
+                        {project.deadline && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            Due: {new Date(project.deadline).toLocaleDateString()}
+                          </div>
+                        )}
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
-                          {project.location}
+                          {project.profiles?.location || 'Remote'}
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
-                          {project.proposals} proposals
+                          {proposals.length} proposals
                         </div>
                       </div>
                     </div>
@@ -136,123 +199,130 @@ const ProjectDetails = () => {
                       <div className="text-gray-700 whitespace-pre-line">{project.description}</div>
                     </div>
                     
-                    <div>
-                      <h3 className="font-semibold mb-2">Skills Required</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {project.skills.map((skill, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {skill}
-                          </Badge>
-                        ))}
+                    {project.skills_required && project.skills_required.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Skills Required</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {project.skills_required.map((skill, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {skill}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
                     <div className="text-sm text-gray-600">
-                      Posted {project.postedDate}
+                      Posted {new Date(project.created_at).toLocaleDateString()}
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Submit Proposal */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Submit a Proposal</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitProposal} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {user && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Submit a Proposal</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmitProposal} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="bidAmount">Your Bid Amount ($)</Label>
+                          <Input
+                            id="bidAmount"
+                            type="number"
+                            placeholder="Enter your bid"
+                            value={bidAmount}
+                            onChange={(e) => setBidAmount(e.target.value)}
+                            className="mt-2"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="deliveryTime">Delivery Time (days)</Label>
+                          <Input
+                            id="deliveryTime"
+                            type="number"
+                            placeholder="e.g., 30"
+                            value={deliveryTime}
+                            onChange={(e) => setDeliveryTime(e.target.value)}
+                            className="mt-2"
+                            required
+                          />
+                        </div>
+                      </div>
+                      
                       <div>
-                        <Label htmlFor="bidAmount">Your Bid Amount ($)</Label>
-                        <Input
-                          id="bidAmount"
-                          type="number"
-                          placeholder="Enter your bid"
-                          value={bidAmount}
-                          onChange={(e) => setBidAmount(e.target.value)}
-                          className="mt-2"
+                        <Label htmlFor="bidDescription">Cover Letter</Label>
+                        <Textarea
+                          id="bidDescription"
+                          placeholder="Describe your approach, experience, and why you're the best fit for this project..."
+                          value={bidDescription}
+                          onChange={(e) => setBidDescription(e.target.value)}
+                          className="mt-2 min-h-[120px]"
                           required
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="deliveryTime">Delivery Time</Label>
-                        <Input
-                          id="deliveryTime"
-                          placeholder="e.g., 4 weeks"
-                          value={deliveryTime}
-                          onChange={(e) => setDeliveryTime(e.target.value)}
-                          className="mt-2"
-                          required
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="bidDescription">Cover Letter</Label>
-                      <Textarea
-                        id="bidDescription"
-                        placeholder="Describe your approach, experience, and why you're the best fit for this project..."
-                        value={bidDescription}
-                        onChange={(e) => setBidDescription(e.target.value)}
-                        className="mt-2 min-h-[120px]"
-                        required
-                      />
-                    </div>
-                    
-                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                      <Send className="h-4 w-4 mr-2" />
-                      Submit Proposal
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+                      
+                      <Button 
+                        type="submit" 
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={submitProposalMutation.isPending}
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        {submitProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Existing Proposals */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Proposals ({proposals.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {proposals.map((proposal) => (
-                      <div key={proposal.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                        <div className="flex items-start gap-4">
-                          <Avatar>
-                            <AvatarImage src={proposal.freelancer.avatar} />
-                            <AvatarFallback>
-                              {proposal.freelancer.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-semibold">{proposal.freelancer.name}</h4>
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span>{proposal.freelancer.rating}</span>
-                                    <span>({proposal.freelancer.reviews} reviews)</span>
+              {proposals.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Proposals ({proposals.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {proposals.map((proposal) => (
+                        <div key={proposal.id} className="border-b border-gray-200 pb-6 last:border-b-0">
+                          <div className="flex items-start gap-4">
+                            <Avatar>
+                              <AvatarImage src={proposal.profiles?.avatar_url} />
+                              <AvatarFallback>
+                                {proposal.profiles?.first_name?.[0]}{proposal.profiles?.last_name?.[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-semibold">
+                                    {proposal.profiles?.first_name} {proposal.profiles?.last_name}
+                                  </h4>
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span>{proposal.profiles?.location}</span>
                                   </div>
-                                  <span>•</span>
-                                  <span>{proposal.freelancer.location}</span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xl font-bold text-green-600">${proposal.proposed_budget}</div>
+                                  <div className="text-sm text-gray-600">in {proposal.delivery_time} days</div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-green-600">${proposal.bidAmount}</div>
-                                <div className="text-sm text-gray-600">in {proposal.deliveryTime}</div>
+                              <p className="text-gray-700 mb-2">{proposal.cover_letter}</p>
+                              <div className="text-sm text-gray-600">
+                                Submitted {new Date(proposal.created_at).toLocaleDateString()}
                               </div>
-                            </div>
-                            <p className="text-gray-700 mb-2">{proposal.description}</p>
-                            <div className="text-sm text-gray-600">
-                              Submitted {proposal.submittedDate}
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Sidebar */}
@@ -266,35 +336,26 @@ const ProjectDetails = () => {
                   <CardContent>
                     <div className="flex items-start gap-3 mb-4">
                       <Avatar>
-                        <AvatarImage src={project.client.avatar} />
-                        <AvatarFallback>TC</AvatarFallback>
+                        <AvatarImage src={project.profiles?.avatar_url} />
+                        <AvatarFallback>
+                          {project.profiles?.first_name?.[0]}{project.profiles?.last_name?.[0]}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
-                        <h4 className="font-semibold">{project.client.name}</h4>
-                        <div className="flex items-center gap-1 text-sm text-gray-600">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span>{project.client.rating}</span>
-                          <span>({project.client.reviews} reviews)</span>
-                        </div>
+                        <h4 className="font-semibold">
+                          {project.profiles?.first_name} {project.profiles?.last_name}
+                        </h4>
                       </div>
                     </div>
                     
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Location</span>
-                        <span>{project.client.location}</span>
+                        <span>{project.profiles?.location || 'Not specified'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Member since</span>
-                        <span>{project.client.memberSince}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total spent</span>
-                        <span className="text-green-600 font-semibold">{project.client.totalSpent}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Projects posted</span>
-                        <span>{project.client.projectsPosted}</span>
+                        <span>{new Date(project.created_at).getFullYear()}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -309,15 +370,11 @@ const ProjectDetails = () => {
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Proposals</span>
-                        <span className="font-semibold">{project.proposals}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Average bid</span>
-                        <span className="font-semibold">$2,150</span>
+                        <span className="font-semibold">{proposals.length}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Posted</span>
-                        <span>{project.postedDate}</span>
+                        <span>{new Date(project.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </CardContent>

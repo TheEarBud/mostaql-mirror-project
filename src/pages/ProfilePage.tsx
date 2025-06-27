@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,48 +10,126 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, MapPin, Calendar, Edit, Plus, Briefcase, Award } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 const ProfilePage = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: 'John Doe',
-    title: 'Full Stack Developer',
-    location: 'New York, USA',
-    joinDate: 'January 2023',
-    description: 'Experienced full-stack developer with 5+ years of experience in web development. Specialized in React, Node.js, and cloud technologies.',
-    hourlyRate: 50,
-    skills: ['React', 'Node.js', 'TypeScript', 'AWS', 'MongoDB'],
-    languages: ['English (Native)', 'Spanish (Conversational)']
+  const [editFormData, setEditFormData] = useState({
+    first_name: '',
+    last_name: '',
+    bio: '',
+    location: '',
+    hourly_rate: '',
+    skills: '',
+    website_url: '',
+    phone: ''
   });
 
-  const projects = [
-    {
-      id: 1,
-      title: 'E-commerce Platform',
-      client: 'TechCorp',
-      completion: '2024-01-15',
-      rating: 5,
-      budget: 3500,
-      description: 'Built a complete e-commerce solution with payment integration'
+  // Fetch user profile
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data;
     },
-    {
-      id: 2,
-      title: 'Portfolio Website',
-      client: 'Creative Agency',
-      completion: '2023-12-20',
-      rating: 4.8,
-      budget: 1200,
-      description: 'Designed and developed a responsive portfolio website'
+    enabled: !!user
+  });
+
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profileData: any) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(profileData)
+        .eq('id', user!.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+      toast.success('Profile updated successfully!');
+      setIsEditing(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update profile');
     }
-  ];
+  });
+
+  const handleEdit = () => {
+    if (profile) {
+      setEditFormData({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        bio: profile.bio || '',
+        location: profile.location || '',
+        hourly_rate: profile.hourly_rate?.toString() || '',
+        skills: profile.skills ? profile.skills.join(', ') : '',
+        website_url: profile.website_url || '',
+        phone: profile.phone || ''
+      });
+    }
+    setIsEditing(true);
+  };
 
   const handleSave = () => {
-    console.log('Saving profile:', profile);
-    setIsEditing(false);
-    // TODO: Implement Supabase profile update
+    const skillsArray = editFormData.skills
+      .split(',')
+      .map(skill => skill.trim())
+      .filter(skill => skill.length > 0);
+
+    updateProfileMutation.mutate({
+      first_name: editFormData.first_name,
+      last_name: editFormData.last_name,
+      bio: editFormData.bio,
+      location: editFormData.location,
+      hourly_rate: editFormData.hourly_rate ? parseFloat(editFormData.hourly_rate) : null,
+      skills: skillsArray.length > 0 ? skillsArray : null,
+      website_url: editFormData.website_url,
+      phone: editFormData.phone,
+      updated_at: new Date().toISOString()
+    });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">Loading profile...</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">Please login to view your profile</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,48 +143,39 @@ const ProfilePage = () => {
               <Card className="sticky top-8">
                 <CardHeader className="text-center">
                   <Avatar className="h-24 w-24 mx-auto mb-4">
-                    <AvatarImage src="/placeholder.svg" alt={profile.name} />
-                    <AvatarFallback className="text-2xl">{profile.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    <AvatarImage src={profile.avatar_url} alt={`${profile.first_name} ${profile.last_name}`} />
+                    <AvatarFallback className="text-2xl">
+                      {profile.first_name?.[0]}{profile.last_name?.[0]}
+                    </AvatarFallback>
                   </Avatar>
-                  <CardTitle className="text-2xl">{profile.name}</CardTitle>
-                  <p className="text-blue-600 font-medium">{profile.title}</p>
-                  <div className="flex items-center justify-center gap-2 text-gray-600 mt-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>{profile.location}</span>
-                  </div>
+                  <CardTitle className="text-2xl">
+                    {profile.first_name} {profile.last_name}
+                  </CardTitle>
+                  <p className="text-blue-600 font-medium capitalize">{profile.user_type}</p>
+                  {profile.location && (
+                    <div className="flex items-center justify-center gap-2 text-gray-600 mt-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-center gap-2 text-gray-600 mt-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Member since {profile.joinDate}</span>
+                    <span>Member since {new Date(profile.created_at).toLocaleDateString()}</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-green-600">${profile.hourlyRate}</div>
-                    <div className="text-sm text-gray-600">per hour</div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Rating</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold">4.9</span>
-                      </div>
+                  {profile.hourly_rate && (
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-green-600">${profile.hourly_rate}</div>
+                      <div className="text-sm text-gray-600">per hour</div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Projects</span>
-                      <span className="font-semibold">47</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Reviews</span>
-                      <span className="font-semibold">42</span>
-                    </div>
-                  </div>
+                  )}
                   
                   <Button 
-                    onClick={() => setIsEditing(!isEditing)} 
+                    onClick={isEditing ? () => setIsEditing(false) : handleEdit} 
                     className="w-full"
                     variant={isEditing ? "outline" : "default"}
+                    disabled={updateProfileMutation.isPending}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     {isEditing ? 'Cancel' : 'Edit Profile'}
@@ -117,10 +187,8 @@ const ProfilePage = () => {
             {/* Main Content */}
             <div className="lg:col-span-2">
               <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-                  <TabsTrigger value="reviews">Reviews</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
 
@@ -131,24 +199,10 @@ const ProfilePage = () => {
                       <CardTitle>About</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {isEditing ? (
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                              id="description"
-                              value={profile.description}
-                              onChange={(e) => setProfile({...profile, description: e.target.value})}
-                              className="mt-2"
-                              rows={4}
-                            />
-                          </div>
-                          <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-                            Save Changes
-                          </Button>
-                        </div>
+                      {profile.bio ? (
+                        <p className="text-gray-700">{profile.bio}</p>
                       ) : (
-                        <p className="text-gray-700">{profile.description}</p>
+                        <p className="text-gray-500 italic">No bio added yet. Click "Edit Profile" to add one.</p>
                       )}
                     </CardContent>
                   </Card>
@@ -156,117 +210,41 @@ const ProfilePage = () => {
                   {/* Skills Section */}
                   <Card>
                     <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <CardTitle>Skills</CardTitle>
-                        {isEditing && (
-                          <Button size="sm" variant="outline">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Skill
-                          </Button>
-                        )}
-                      </div>
+                      <CardTitle>Skills</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {profile.skills.map((skill, index) => (
-                          <Badge key={index} variant="secondary" className="text-sm">
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
+                      {profile.skills && profile.skills.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.skills.map((skill, index) => (
+                            <Badge key={index} variant="secondary" className="text-sm">
+                              {skill}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic">No skills added yet. Click "Edit Profile" to add your skills.</p>
+                      )}
                     </CardContent>
                   </Card>
 
-                  {/* Languages Section */}
+                  {/* Contact Information */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Languages</CardTitle>
+                      <CardTitle>Contact Information</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {profile.languages.map((language, index) => (
-                          <div key={index} className="text-gray-700">{language}</div>
-                        ))}
-                      </div>
+                    <CardContent className="space-y-2">
+                      <div><strong>Email:</strong> {profile.email}</div>
+                      {profile.phone && <div><strong>Phone:</strong> {profile.phone}</div>}
+                      {profile.website_url && (
+                        <div>
+                          <strong>Website:</strong> 
+                          <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">
+                            {profile.website_url}
+                          </a>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                <TabsContent value="portfolio" className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Portfolio</h2>
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Project
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {projects.map((project) => (
-                      <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg">{project.title}</CardTitle>
-                              <p className="text-gray-600">{project.client}</p>
-                            </div>
-                            <div className="text-right">
-                              <div className="flex items-center gap-1">
-                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                <span className="font-semibold">{project.rating}</span>
-                              </div>
-                              <div className="text-sm text-gray-600">${project.budget}</div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-gray-700 mb-3">{project.description}</p>
-                          <div className="text-sm text-gray-600">
-                            Completed: {new Date(project.completion).toLocaleDateString()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="reviews" className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Reviews</h2>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold">4.9</div>
-                      <div className="text-sm text-gray-600">42 reviews</div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((review) => (
-                      <Card key={review}>
-                        <CardContent className="pt-6">
-                          <div className="flex items-start gap-4">
-                            <Avatar>
-                              <AvatarFallback>JD</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="font-semibold">Jane Doe</div>
-                                <div className="flex items-center gap-1">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                  ))}
-                                </div>
-                                <div className="text-sm text-gray-600">2 weeks ago</div>
-                              </div>
-                              <p className="text-gray-700">
-                                Excellent work! Very professional and delivered on time. 
-                                The quality exceeded my expectations. Highly recommended!
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-6">
@@ -275,30 +253,112 @@ const ProfilePage = () => {
                       <CardTitle>Profile Settings</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
-                          <Input
-                            id="hourlyRate"
-                            type="number"
-                            value={profile.hourlyRate}
-                            onChange={(e) => setProfile({...profile, hourlyRate: parseInt(e.target.value)})}
-                            className="mt-2"
-                          />
+                      {isEditing ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="firstName">First Name</Label>
+                              <Input
+                                id="firstName"
+                                value={editFormData.first_name}
+                                onChange={(e) => setEditFormData({...editFormData, first_name: e.target.value})}
+                                className="mt-2"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="lastName">Last Name</Label>
+                              <Input
+                                id="lastName"
+                                value={editFormData.last_name}
+                                onChange={(e) => setEditFormData({...editFormData, last_name: e.target.value})}
+                                className="mt-2"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="bio">Bio</Label>
+                            <Textarea
+                              id="bio"
+                              value={editFormData.bio}
+                              onChange={(e) => setEditFormData({...editFormData, bio: e.target.value})}
+                              className="mt-2"
+                              rows={4}
+                              placeholder="Tell us about yourself..."
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="location">Location</Label>
+                              <Input
+                                id="location"
+                                value={editFormData.location}
+                                onChange={(e) => setEditFormData({...editFormData, location: e.target.value})}
+                                className="mt-2"
+                                placeholder="City, Country"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+                              <Input
+                                id="hourlyRate"
+                                type="number"
+                                value={editFormData.hourly_rate}
+                                onChange={(e) => setEditFormData({...editFormData, hourly_rate: e.target.value})}
+                                className="mt-2"
+                                placeholder="50"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="skills">Skills (comma separated)</Label>
+                            <Input
+                              id="skills"
+                              value={editFormData.skills}
+                              onChange={(e) => setEditFormData({...editFormData, skills: e.target.value})}
+                              className="mt-2"
+                              placeholder="React, Node.js, TypeScript"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="phone">Phone</Label>
+                              <Input
+                                id="phone"
+                                value={editFormData.phone}
+                                onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                                className="mt-2"
+                                placeholder="+1234567890"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="website">Website</Label>
+                              <Input
+                                id="website"
+                                value={editFormData.website_url}
+                                onChange={(e) => setEditFormData({...editFormData, website_url: e.target.value})}
+                                className="mt-2"
+                                placeholder="https://yourwebsite.com"
+                              />
+                            </div>
+                          </div>
+
+                          <Button 
+                            onClick={handleSave} 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={updateProfileMutation.isPending}
+                          >
+                            {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
+                          </Button>
                         </div>
-                        <div>
-                          <Label htmlFor="location">Location</Label>
-                          <Input
-                            id="location"
-                            value={profile.location}
-                            onChange={(e) => setProfile({...profile, location: e.target.value})}
-                            className="mt-2"
-                          />
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-gray-600 mb-4">Click "Edit Profile" to update your information</p>
                         </div>
-                      </div>
-                      <Button className="bg-blue-600 hover:bg-blue-700">
-                        Save Settings
-                      </Button>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
