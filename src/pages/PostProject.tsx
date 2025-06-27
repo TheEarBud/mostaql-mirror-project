@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,29 +11,68 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useCreateProject } from '@/hooks/useProjects';
+import { toast } from 'sonner';
 
 const PostProject = () => {
+  const { user } = useAuth();
+  const { t, isRTL } = useLanguage();
+  const navigate = useNavigate();
+  const createProject = useCreateProject();
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     budgetType: 'fixed',
-    budget: '',
-    timeframe: '',
-    skills: [],
-    attachments: []
+    budgetMin: '',
+    budgetMax: '',
+    deadline: '',
+    skills: []
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Project submission:', formData);
-    // TODO: Implement Supabase data submission
+    
+    if (!user) {
+      toast.error('You must be logged in to post a project');
+      return;
+    }
+
+    try {
+      const projectData = {
+        client_id: user.id,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        project_type: formData.budgetType,
+        budget_min: formData.budgetMin ? parseFloat(formData.budgetMin) : null,
+        budget_max: formData.budgetMax ? parseFloat(formData.budgetMax) : null,
+        deadline: formData.deadline || null,
+        skills_required: formData.skills
+      };
+
+      await createProject.mutateAsync(projectData);
+      toast.success('Project posted successfully!');
+      navigate('/projects');
+    } catch (error) {
+      console.error('Error posting project:', error);
+      toast.error('Failed to post project. Please try again.');
+    }
   };
 
   const categories = [
     'Web Development',
     'Mobile Development',
-    'Design & Creative',
+    'Design & Creative', 
     'Writing & Content',
     'Digital Marketing',
     'Data Science',
@@ -49,27 +89,31 @@ const PostProject = () => {
     'Content Writing', 'SEO', 'Social Media Marketing', 'Data Analysis'
   ];
 
+  if (!user) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`}>
       <Navbar />
       
       <div className="pt-24 pb-12">
         <div className="max-w-4xl mx-auto px-4">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Post a New Project</h1>
-            <p className="text-gray-600">Tell us what you need done and receive competitive proposals from talented freelancers.</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('postProject.title')}</h1>
+            <p className="text-gray-600">{t('postProject.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Project Title */}
             <Card>
               <CardHeader>
-                <CardTitle>Project Title</CardTitle>
+                <CardTitle>{t('postProject.projectTitle')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="title">What do you need done?</Label>
+                    <Label htmlFor="title">{t('postProject.whatNeedDone')}</Label>
                     <Input
                       id="title"
                       placeholder="e.g., Build a responsive e-commerce website"
@@ -80,10 +124,10 @@ const PostProject = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="category">Category</Label>
+                    <Label htmlFor="category">{t('projects.category')}</Label>
                     <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
                       <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={t('postProject.selectCategory')} />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
@@ -99,15 +143,15 @@ const PostProject = () => {
             {/* Project Description */}
             <Card>
               <CardHeader>
-                <CardTitle>Project Description</CardTitle>
+                <CardTitle>{t('postProject.description')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="description">Describe your project in detail</Label>
+                    <Label htmlFor="description">{t('postProject.describeProject')}</Label>
                     <Textarea
                       id="description"
-                      placeholder="Provide a detailed description of your project, including requirements, expectations, and any specific instructions..."
+                      placeholder="Provide a detailed description of your project..."
                       value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
                       className="mt-2 min-h-[120px]"
@@ -121,58 +165,64 @@ const PostProject = () => {
             {/* Budget & Timeline */}
             <Card>
               <CardHeader>
-                <CardTitle>Budget & Timeline</CardTitle>
+                <CardTitle>{t('postProject.budgetTimeline')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
                   <div>
-                    <Label>Budget Type</Label>
+                    <Label>{t('postProject.budgetType')}</Label>
                     <RadioGroup 
                       value={formData.budgetType} 
                       onValueChange={(value) => setFormData({...formData, budgetType: value})}
                       className="mt-2"
                     >
-                      <div className="flex items-center space-x-2">
+                      <div className={`flex items-center space-x-2 ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <RadioGroupItem value="fixed" id="fixed" />
-                        <Label htmlFor="fixed">Fixed Price - Pay a set amount for the entire project</Label>
+                        <Label htmlFor="fixed">{t('postProject.fixedPrice')}</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className={`flex items-center space-x-2 ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <RadioGroupItem value="hourly" id="hourly" />
-                        <Label htmlFor="hourly">Hourly Rate - Pay per hour of work</Label>
+                        <Label htmlFor="hourly">{t('postProject.hourlyRate')}</Label>
                       </div>
                     </RadioGroup>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="budget">
-                        {formData.budgetType === 'fixed' ? 'Project Budget ($)' : 'Hourly Rate ($)'}
+                      <Label htmlFor="budgetMin">
+                        {formData.budgetType === 'fixed' ? t('postProject.projectBudget') : t('postProject.hourlyRateLabel')} (Min)
                       </Label>
                       <Input
-                        id="budget"
+                        id="budgetMin"
                         type="number"
-                        placeholder={formData.budgetType === 'fixed' ? 'e.g., 1500' : 'e.g., 25'}
-                        value={formData.budget}
-                        onChange={(e) => setFormData({...formData, budget: e.target.value})}
+                        placeholder="e.g., 500"
+                        value={formData.budgetMin}
+                        onChange={(e) => setFormData({...formData, budgetMin: e.target.value})}
                         className="mt-2"
-                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="timeframe">Project Duration</Label>
-                      <Select value={formData.timeframe} onValueChange={(value) => setFormData({...formData, timeframe: value})}>
-                        <SelectTrigger className="mt-2">
-                          <SelectValue placeholder="Select timeframe" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="less-than-1-week">Less than 1 week</SelectItem>
-                          <SelectItem value="1-2-weeks">1-2 weeks</SelectItem>
-                          <SelectItem value="2-4-weeks">2-4 weeks</SelectItem>
-                          <SelectItem value="1-2-months">1-2 months</SelectItem>
-                          <SelectItem value="2-3-months">2-3 months</SelectItem>
-                          <SelectItem value="more-than-3-months">More than 3 months</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="budgetMax">
+                        {formData.budgetType === 'fixed' ? t('postProject.projectBudget') : t('postProject.hourlyRateLabel')} (Max)
+                      </Label>
+                      <Input
+                        id="budgetMax"
+                        type="number"
+                        placeholder="e.g., 1500"
+                        value={formData.budgetMax}
+                        onChange={(e) => setFormData({...formData, budgetMax: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="deadline">Deadline (Optional)</Label>
+                      <Input
+                        id="deadline"
+                        type="date"
+                        value={formData.deadline}
+                        onChange={(e) => setFormData({...formData, deadline: e.target.value})}
+                        className="mt-2"
+                      />
                     </div>
                   </div>
                 </div>
@@ -182,14 +232,14 @@ const PostProject = () => {
             {/* Skills Required */}
             <Card>
               <CardHeader>
-                <CardTitle>Skills Required</CardTitle>
+                <CardTitle>{t('postProject.skillsRequired')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Label>Select the skills needed for this project:</Label>
+                  <Label>{t('postProject.selectSkills')}</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {popularSkills.map((skill) => (
-                      <div key={skill} className="flex items-center space-x-2">
+                      <div key={skill} className={`flex items-center space-x-2 ${isRTL ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <Checkbox 
                           id={skill}
                           checked={formData.skills.includes(skill)}
@@ -217,8 +267,13 @@ const PostProject = () => {
 
             {/* Submit Button */}
             <div className="flex justify-center">
-              <Button type="submit" size="lg" className="bg-blue-600 hover:bg-blue-700 px-8">
-                Post Project
+              <Button 
+                type="submit" 
+                size="lg" 
+                className="bg-blue-600 hover:bg-blue-700 px-8"
+                disabled={createProject.isPending}
+              >
+                {createProject.isPending ? t('common.loading') : t('postProject.submit')}
               </Button>
             </div>
           </form>

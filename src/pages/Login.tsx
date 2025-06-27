@@ -1,72 +1,93 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { toast } from 'sonner';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signIn } = useAuth();
+  const { t, isRTL } = useLanguage();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
-    // TODO: Implement Supabase authentication
+    setLoading(true);
+    
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(t('common.success'));
+        navigate('/');
+      }
+    } catch (error) {
+      toast.error(t('common.error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4">
+    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4 ${isRTL ? 'rtl' : 'ltr'}`}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="text-3xl font-bold text-blue-600">
             farz.pw
           </Link>
-          <p className="text-gray-600 mt-2">Welcome back!</p>
+          <p className="text-gray-600 mt-2">{t('auth.welcomeBack')}</p>
         </div>
 
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Sign In</CardTitle>
+            <CardTitle className="text-2xl text-center">{t('auth.signIn')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className={`absolute top-3 h-4 w-4 text-gray-400 ${isRTL ? 'right-3' : 'left-3'}`} />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t('auth.email')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    className={isRTL ? 'pr-10' : 'pl-10'}
                     required
                   />
                 </div>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('auth.password')}</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className={`absolute top-3 h-4 w-4 text-gray-400 ${isRTL ? 'right-3' : 'left-3'}`} />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
+                    placeholder={t('auth.password')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    className={`${isRTL ? 'pr-10 pl-10' : 'pl-10 pr-10'}`}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    className={`absolute top-3 text-gray-400 hover:text-gray-600 ${isRTL ? 'left-3' : 'right-3'}`}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -75,24 +96,24 @@ const Login = () => {
 
               <div className="flex items-center justify-between">
                 <label className="flex items-center text-sm">
-                  <input type="checkbox" className="mr-2" />
-                  Remember me
+                  <input type="checkbox" className={`${isRTL ? 'ml-2' : 'mr-2'}`} />
+                  {t('auth.rememberMe')}
                 </label>
                 <a href="#" className="text-sm text-blue-600 hover:underline">
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </a>
               </div>
 
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Sign In
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? t('common.loading') : t('auth.signIn')}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-gray-600">
-                Don't have an account?{' '}
+                {t('auth.noAccount')}{' '}
                 <Link to="/register" className="text-blue-600 hover:underline">
-                  Sign up
+                  {t('auth.signUp')}
                 </Link>
               </p>
             </div>

@@ -9,7 +9,213 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          hourly_rate: number | null
+          id: string
+          last_name: string | null
+          location: string | null
+          phone: string | null
+          skills: string[] | null
+          updated_at: string
+          user_type: string
+          website_url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hourly_rate?: number | null
+          id: string
+          last_name?: string | null
+          location?: string | null
+          phone?: string | null
+          skills?: string[] | null
+          updated_at?: string
+          user_type?: string
+          website_url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hourly_rate?: number | null
+          id?: string
+          last_name?: string | null
+          location?: string | null
+          phone?: string | null
+          skills?: string[] | null
+          updated_at?: string
+          user_type?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          budget_max: number | null
+          budget_min: number | null
+          category: string
+          client_id: string
+          created_at: string
+          deadline: string | null
+          description: string
+          id: string
+          project_type: string | null
+          skills_required: string[] | null
+          status: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          budget_max?: number | null
+          budget_min?: number | null
+          category: string
+          client_id: string
+          created_at?: string
+          deadline?: string | null
+          description: string
+          id?: string
+          project_type?: string | null
+          skills_required?: string[] | null
+          status?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          budget_max?: number | null
+          budget_min?: number | null
+          category?: string
+          client_id?: string
+          created_at?: string
+          deadline?: string | null
+          description?: string
+          id?: string
+          project_type?: string | null
+          skills_required?: string[] | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          cover_letter: string
+          created_at: string
+          delivery_time: number
+          freelancer_id: string
+          id: string
+          project_id: string
+          proposed_budget: number
+          status: string | null
+        }
+        Insert: {
+          cover_letter: string
+          created_at?: string
+          delivery_time: number
+          freelancer_id: string
+          id?: string
+          project_id: string
+          proposed_budget: number
+          status?: string | null
+        }
+        Update: {
+          cover_letter?: string
+          created_at?: string
+          delivery_time?: number
+          freelancer_id?: string
+          id?: string
+          project_id?: string
+          proposed_budget?: number
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          project_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          rating?: number
+          reviewee_id?: string
+          reviewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewee_id_fkey"
+            columns: ["reviewee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

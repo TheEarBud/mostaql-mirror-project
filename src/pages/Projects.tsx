@@ -9,120 +9,87 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, MapPin, Clock, DollarSign, Users } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { useProjects } from '@/hooks/useProjects';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatDistanceToNow } from 'date-fns';
 
 const Projects = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('all');
-  const [budget, setBudget] = useState('all');
+  const { data: projects, isLoading } = useProjects();
+  const { t, isRTL } = useLanguage();
 
-  // Mock data - replace with actual data from Supabase
-  const projects = [
-    {
-      id: 1,
-      title: 'E-commerce Website Development',
-      description: 'Looking for a skilled developer to build a modern e-commerce website with payment integration and admin panel.',
-      budget: '$1,500-$3,000',
-      timeframe: '2-3 months',
-      location: 'Remote',
-      skills: ['React', 'Node.js', 'MongoDB', 'Stripe'],
-      proposals: 15,
-      postedDate: '2 days ago',
-      category: 'Web Development'
-    },
-    {
-      id: 2,
-      title: 'Mobile App UI/UX Design',
-      description: 'Need a creative designer for a fitness tracking mobile app. Must have experience with health apps.',
-      budget: '$800-$1,200',
-      timeframe: '3-4 weeks',
-      location: 'Remote',
-      skills: ['Figma', 'Adobe XD', 'Mobile Design', 'Prototyping'],
-      proposals: 8,
-      postedDate: '1 day ago',
-      category: 'Design'
-    },
-    {
-      id: 3,
-      title: 'Content Marketing Strategy',
-      description: 'Seeking an experienced content marketer to develop and execute a comprehensive content strategy.',
-      budget: '$500-$1,000',
-      timeframe: '1 month',
-      location: 'Remote',
-      skills: ['Content Strategy', 'SEO', 'Social Media', 'Analytics'],
-      proposals: 12,
-      postedDate: '3 days ago',
-      category: 'Marketing'
-    },
-    {
-      id: 4,
-      title: 'Python Data Analysis Project',
-      description: 'Analyze customer data to identify trends and create visualizations. Experience with pandas and matplotlib required.',
-      budget: '$300-$600',
-      timeframe: '2 weeks',
-      location: 'Remote',
-      skills: ['Python', 'Pandas', 'Matplotlib', 'Data Science'],
-      proposals: 6,
-      postedDate: '5 hours ago',
-      category: 'Data Science'
-    }
+  const categories = [
+    'Web Development',
+    'Mobile Development', 
+    'Design & Creative',
+    'Writing & Content',
+    'Digital Marketing',
+    'Data Science',
+    'Translation',
+    'Video & Animation',
+    'Music & Audio',
+    'Business'
   ];
 
-  const filteredProjects = projects.filter(project => {
+  const filteredProjects = projects?.filter(project => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = category === 'all' || project.category === category;
     return matchesSearch && matchesCategory;
-  });
+  }) || [];
+
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`}>
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p>{t('common.loading')}</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`}>
       <Navbar />
       
       <div className="pt-24 pb-12">
         <div className="max-w-6xl mx-auto px-4">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Browse Projects</h1>
-            <p className="text-gray-600">Find your next opportunity from thousands of projects</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('projects.title')}</h1>
+            <p className="text-gray-600">{t('projects.subtitle')}</p>
           </div>
 
           {/* Filters */}
           <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Search className={`absolute top-3 h-4 w-4 text-gray-400 ${isRTL ? 'right-3' : 'left-3'}`} />
                 <Input
-                  placeholder="Search projects..."
+                  placeholder={t('projects.search')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className={isRTL ? 'pr-10' : 'pl-10'}
                 />
               </div>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Category" />
+                  <SelectValue placeholder={t('projects.category')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="Web Development">Web Development</SelectItem>
-                  <SelectItem value="Design">Design</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Data Science">Data Science</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={budget} onValueChange={setBudget}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Budget Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Budgets</SelectItem>
-                  <SelectItem value="under-500">Under $500</SelectItem>
-                  <SelectItem value="500-1000">$500-$1,000</SelectItem>
-                  <SelectItem value="1000-3000">$1,000-$3,000</SelectItem>
-                  <SelectItem value="over-3000">Over $3,000</SelectItem>
+                  <SelectItem value="all">{t('projects.allCategories')}</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Button className="bg-blue-600 hover:bg-blue-700">
-                Search
+                {t('projects.search')}
               </Button>
             </div>
           </div>
@@ -139,18 +106,22 @@ const Projects = () => {
                           {project.title}
                         </CardTitle>
                       </Link>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
+                      <div className={`flex items-center gap-4 mt-2 text-sm text-gray-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className={`flex items-center gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
                           <DollarSign className="h-4 w-4" />
-                          {project.budget}
+                          {project.budget_min && project.budget_max 
+                            ? `$${project.budget_min}-$${project.budget_max}`
+                            : project.budget_min 
+                            ? `$${project.budget_min}`
+                            : 'Budget not specified'
+                          }
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className={`flex items-center gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
                           <Clock className="h-4 w-4" />
-                          {project.timeframe}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {project.location}
+                          {project.deadline 
+                            ? new Date(project.deadline).toLocaleDateString()
+                            : 'No deadline'
+                          }
                         </div>
                       </div>
                     </div>
@@ -160,25 +131,29 @@ const Projects = () => {
                 <CardContent>
                   <p className="text-gray-700 mb-4">{project.description}</p>
                   
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {project.skills.map((skill, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
+                  {project.skills_required && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {project.skills_required.map((skill, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-4 text-sm text-gray-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                      <div className={`flex items-center gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <Users className="h-4 w-4" />
-                        {project.proposals} proposals
+                        {project.proposals?.length || 0} {t('projects.proposals')}
                       </div>
-                      <span>Posted {project.postedDate}</span>
+                      <span>
+                        {t('projects.posted')} {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
+                      </span>
                     </div>
                     <Link to={`/project/${project.id}`}>
                       <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                        View Details
+                        {t('projects.viewDetails')}
                       </Button>
                     </Link>
                   </div>
@@ -186,6 +161,12 @@ const Projects = () => {
               </Card>
             ))}
           </div>
+
+          {filteredProjects.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No projects found matching your criteria.</p>
+            </div>
+          )}
         </div>
       </div>
       
