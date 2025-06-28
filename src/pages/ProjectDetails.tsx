@@ -358,24 +358,14 @@ const ProjectDetails = () => {
                                   Submitted {new Date(proposal.created_at).toLocaleDateString()}
                                 </div>
                                 <div className="flex gap-2">
-                                  {/* Chat button for project owner */}
-                                  {isProjectOwner && user && (
+                                  {/* Chat button - ONLY for project owner */}
+                                  {isProjectOwner && (
                                     <ChatDialog
                                       projectId={id!}
                                       receiverId={proposal.freelancer_id}
                                       receiverName={`${proposal.profiles?.first_name} ${proposal.profiles?.last_name}`}
                                       receiverAvatar={proposal.profiles?.avatar_url}
-                                      triggerText="Chat"
-                                    />
-                                  )}
-                                  {/* Chat button for freelancer to contact client */}
-                                  {user?.id === proposal.freelancer_id && (
-                                    <ChatDialog
-                                      projectId={id!}
-                                      receiverId={project.client_id}
-                                      receiverName={`${project.profiles?.first_name} ${project.profiles?.last_name}`}
-                                      receiverAvatar={project.profiles?.avatar_url}
-                                      triggerText="Chat with Client"
+                                      triggerText="Contact Freelancer"
                                     />
                                   )}
                                   {/* Delete button for proposal owner */}

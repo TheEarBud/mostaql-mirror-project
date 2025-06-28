@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCreateProject } from '@/hooks/useProjects';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const PostProject = () => {
   const { user } = useAuth();
@@ -33,17 +34,46 @@ const PostProject = () => {
     skills: []
   });
 
+  // Fetch user profile to check user type
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
   React.useEffect(() => {
     if (!user) {
       navigate('/login');
+      return;
     }
-  }, [user, navigate]);
+    
+    // Check if user is employer after profile loads
+    if (profile && profile.user_type !== 'client') {
+      toast.error('Only clients/employers can post projects');
+      navigate('/projects');
+    }
+  }, [user, profile, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
       toast.error('You must be logged in to post a project');
+      return;
+    }
+
+    if (profile?.user_type !== 'client') {
+      toast.error('Only clients/employers can post projects');
       return;
     }
 
@@ -69,6 +99,35 @@ const PostProject = () => {
     }
   };
 
+  // Show loading while checking profile
+  if (!user || profileLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">Loading...</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show error if not employer
+  if (profile && profile.user_type !== 'client') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Restricted</h2>
+            <p className="text-gray-600">Only clients/employers can post projects.</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   const categories = [
     'Web Development',
     'Mobile Development',
@@ -88,10 +147,6 @@ const PostProject = () => {
     'HTML/CSS', 'WordPress', 'Shopify', 'Figma', 'Photoshop',
     'Content Writing', 'SEO', 'Social Media Marketing', 'Data Analysis'
   ];
-
-  if (!user) {
-    return null;
-  }
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`}>
