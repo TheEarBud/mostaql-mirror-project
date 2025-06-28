@@ -206,6 +206,16 @@ const ProjectDetails = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{project.category}</Badge>
+                      {/* Chat button for freelancers to contact project owner */}
+                      {user && !isProjectOwner && (
+                        <ChatDialog
+                          projectId={id!}
+                          receiverId={project.client_id}
+                          receiverName={`${project.profiles?.first_name} ${project.profiles?.last_name}`}
+                          receiverAvatar={project.profiles?.avatar_url}
+                          triggerText="Contact Client"
+                        />
+                      )}
                       {isProjectOwner && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -365,7 +375,7 @@ const ProjectDetails = () => {
                                       receiverId={proposal.freelancer_id}
                                       receiverName={`${proposal.profiles?.first_name} ${proposal.profiles?.last_name}`}
                                       receiverAvatar={proposal.profiles?.avatar_url}
-                                      triggerText="Contact Freelancer"
+                                      triggerText="Contact"
                                     />
                                   )}
                                   {/* Delete button for proposal owner */}

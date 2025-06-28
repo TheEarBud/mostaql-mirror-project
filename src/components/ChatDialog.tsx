@@ -33,10 +33,22 @@ const ChatDialog = ({ projectId, receiverId, receiverName, receiverAvatar, trigg
     (msg.sender_id === receiverId && msg.receiver_id === user?.id)
   );
 
+  console.log('Current user:', user?.id);
+  console.log('Receiver ID:', receiverId);
+  console.log('All messages:', messages);
+  console.log('Filtered chat messages:', chatMessages);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user || !newMessage.trim()) return;
+
+    console.log('Sending message:', {
+      project_id: projectId,
+      sender_id: user.id,
+      receiver_id: receiverId,
+      content: newMessage.trim()
+    });
 
     sendMessageMutation.mutate({
       project_id: projectId,
@@ -44,8 +56,10 @@ const ChatDialog = ({ projectId, receiverId, receiverName, receiverAvatar, trigg
       receiver_id: receiverId,
       content: newMessage.trim()
     }, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        console.log('Message sent successfully:', data);
         setNewMessage('');
+        refetch(); // Refresh messages
         // Scroll to bottom after sending
         setTimeout(() => {
           if (scrollAreaRef.current) {
@@ -54,6 +68,7 @@ const ChatDialog = ({ projectId, receiverId, receiverName, receiverAvatar, trigg
         }, 100);
       },
       onError: (error: any) => {
+        console.error('Failed to send message:', error);
         toast.error(error.message || 'Failed to send message');
       }
     });
@@ -69,6 +84,7 @@ const ChatDialog = ({ projectId, receiverId, receiverName, receiverAvatar, trigg
   // Refresh messages when dialog opens
   useEffect(() => {
     if (isOpen) {
+      console.log('Dialog opened, refreshing messages...');
       refetch();
     }
   }, [isOpen, refetch]);
