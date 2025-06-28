@@ -8,12 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send, Trash2, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { useProposals, useCreateProposal } from '@/hooks/useProposals';
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -23,6 +25,7 @@ const ProjectDetails = () => {
   const [bidAmount, setBidAmount] = useState('');
   const [bidDescription, setBidDescription] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
 
   // Fetch project details
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -36,7 +39,8 @@ const ProjectDetails = () => {
             first_name,
             last_name,
             avatar_url,
-            location
+            location,
+            email
           )
         `)
         .eq('id', id)
@@ -47,56 +51,45 @@ const ProjectDetails = () => {
     }
   });
 
-  // Fetch proposals for this project
-  const { data: proposals = [] } = useQuery({
-    queryKey: ['proposals', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  // Use the proposals hook
+  const { data: proposals = [] } = useProposals(id);
+  const createProposalMutation = useCreateProposal();
+
+  // Delete proposal mutation
+  const deleteProposalMutation = useMutation({
+    mutationFn: async (proposalId: string) => {
+      const { error } = await supabase
         .from('proposals')
-        .select(`
-          *,
-          profiles:freelancer_id (
-            first_name,
-            last_name,
-            avatar_url,
-            location
-          )
-        `)
-        .eq('project_id', id)
-        .order('created_at', { ascending: false });
+        .delete()
+        .eq('id', proposalId);
 
       if (error) throw error;
-      return data;
-    }
-  });
-
-  // Submit proposal mutation
-  const submitProposalMutation = useMutation({
-    mutationFn: async (proposalData: {
-      project_id: string;
-      freelancer_id: string;
-      cover_letter: string;
-      proposed_budget: number;
-      delivery_time: number;
-    }) => {
-      const { data, error } = await supabase
-        .from('proposals')
-        .insert([proposalData])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proposals', id] });
-      toast.success('Proposal submitted successfully!');
-      setBidAmount('');
-      setBidDescription('');
-      setDeliveryTime('');
+      toast.success('Proposal deleted successfully!');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to submit proposal');
+      toast.error(error.message || 'Failed to delete proposal');
+    }
+  });
+
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Project deleted successfully!');
+      navigate('/projects');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete project');
     }
   });
 
@@ -114,13 +107,46 @@ const ProjectDetails = () => {
       return;
     }
 
-    submitProposalMutation.mutate({
+    createProposalMutation.mutate({
       project_id: id!,
       freelancer_id: user.id,
       cover_letter: bidDescription,
       proposed_budget: parseFloat(bidAmount),
       delivery_time: parseInt(deliveryTime)
+    }, {
+      onSuccess: () => {
+        setBidAmount('');
+        setBidDescription('');
+        setDeliveryTime('');
+        toast.success('Proposal submitted successfully!');
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to submit proposal');
+      }
     });
+  };
+
+  const handleDeleteProposal = (proposalId: string) => {
+    deleteProposalMutation.mutate(proposalId);
+  };
+
+  const handleDeleteProject = () => {
+    if (project) {
+      deleteProjectMutation.mutate(project.id);
+    }
+  };
+
+  const handleContactFreelancer = (freelancerEmail: string, freelancerName: string) => {
+    // For now, we'll just show the contact info or open email client
+    if (contactMessage.trim()) {
+      const subject = encodeURIComponent(`Regarding your proposal for: ${project?.title}`);
+      const body = encodeURIComponent(`Hi ${freelancerName},\n\n${contactMessage}\n\nBest regards`);
+      window.open(`mailto:${freelancerEmail}?subject=${subject}&body=${body}`);
+      setContactMessage('');
+      toast.success('Opening email client...');
+    } else {
+      toast.error('Please enter a message first');
+    }
   };
 
   if (projectLoading) {
@@ -152,6 +178,8 @@ const ProjectDetails = () => {
     : project.budget_min 
     ? `$${project.budget_min}+`
     : 'Budget not specified';
+
+  const isProjectOwner = user?.id === project.client_id;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,7 +217,33 @@ const ProjectDetails = () => {
                         </div>
                       </div>
                     </div>
-                    <Badge variant="secondary">{project.category}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{project.category}</Badge>
+                      {isProjectOwner && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete Project
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this project? This action cannot be undone and will also delete all proposals.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteProject}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -219,8 +273,8 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
 
-              {/* Submit Proposal */}
-              {user && (
+              {/* Submit Proposal - only show if not project owner */}
+              {user && !isProjectOwner && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Submit a Proposal</CardTitle>
@@ -269,12 +323,33 @@ const ProjectDetails = () => {
                       <Button 
                         type="submit" 
                         className="bg-blue-600 hover:bg-blue-700"
-                        disabled={submitProposalMutation.isPending}
+                        disabled={createProposalMutation.isPending}
                       >
                         <Send className="h-4 w-4 mr-2" />
-                        {submitProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
+                        {createProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
                       </Button>
                     </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Contact Form for Project Owner */}
+              {isProjectOwner && proposals.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contact Freelancers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div>
+                      <Label htmlFor="contactMessage">Message Template</Label>
+                      <Textarea
+                        id="contactMessage"
+                        placeholder="Write a message to send to freelancers..."
+                        value={contactMessage}
+                        onChange={(e) => setContactMessage(e.target.value)}
+                        className="mt-2 min-h-[100px]"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -312,8 +387,51 @@ const ProjectDetails = () => {
                                 </div>
                               </div>
                               <p className="text-gray-700 mb-2">{proposal.cover_letter}</p>
-                              <div className="text-sm text-gray-600">
-                                Submitted {new Date(proposal.created_at).toLocaleDateString()}
+                              <div className="flex justify-between items-center">
+                                <div className="text-sm text-gray-600">
+                                  Submitted {new Date(proposal.created_at).toLocaleDateString()}
+                                </div>
+                                <div className="flex gap-2">
+                                  {/* Contact button for project owner */}
+                                  {isProjectOwner && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleContactFreelancer(
+                                        proposal.profiles?.email || '', 
+                                        `${proposal.profiles?.first_name} ${proposal.profiles?.last_name}`
+                                      )}
+                                    >
+                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                      Contact
+                                    </Button>
+                                  )}
+                                  {/* Delete button for proposal owner */}
+                                  {user?.id === proposal.freelancer_id && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button size="sm" variant="destructive">
+                                          <Trash2 className="h-4 w-4 mr-1" />
+                                          Delete
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete Proposal</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete your proposal? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteProposal(proposal.id)}>
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

@@ -16,7 +16,8 @@ export const useProposals = (projectId?: string) => {
             first_name,
             last_name,
             avatar_url,
-            location
+            location,
+            email
           )
         `)
         .eq('project_id', projectId)
@@ -51,6 +52,25 @@ export const useCreateProposal = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', data.project_id] });
+    }
+  });
+};
+
+export const useDeleteProposal = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (proposalId: string) => {
+      const { error } = await supabase
+        .from('proposals')
+        .delete()
+        .eq('id', proposalId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, proposalId) => {
+      // Invalidate all proposals queries since we don't know which project this belonged to
+      queryClient.invalidateQueries({ queryKey: ['proposals'] });
     }
   });
 };
