@@ -9,13 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send, Trash2, MessageSquare } from 'lucide-react';
+import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useProposals, useCreateProposal } from '@/hooks/useProposals';
+import ChatDialog from '@/components/ChatDialog';
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -25,7 +26,6 @@ const ProjectDetails = () => {
   const [bidAmount, setBidAmount] = useState('');
   const [bidDescription, setBidDescription] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
-  const [contactMessage, setContactMessage] = useState('');
 
   // Fetch project details
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -133,19 +133,6 @@ const ProjectDetails = () => {
   const handleDeleteProject = () => {
     if (project) {
       deleteProjectMutation.mutate(project.id);
-    }
-  };
-
-  const handleContactFreelancer = (freelancerEmail: string, freelancerName: string) => {
-    // For now, we'll just show the contact info or open email client
-    if (contactMessage.trim()) {
-      const subject = encodeURIComponent(`Regarding your proposal for: ${project?.title}`);
-      const body = encodeURIComponent(`Hi ${freelancerName},\n\n${contactMessage}\n\nBest regards`);
-      window.open(`mailto:${freelancerEmail}?subject=${subject}&body=${body}`);
-      setContactMessage('');
-      toast.success('Opening email client...');
-    } else {
-      toast.error('Please enter a message first');
     }
   };
 
@@ -333,27 +320,6 @@ const ProjectDetails = () => {
                 </Card>
               )}
 
-              {/* Contact Form for Project Owner */}
-              {isProjectOwner && proposals.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Contact Freelancers</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div>
-                      <Label htmlFor="contactMessage">Message Template</Label>
-                      <Textarea
-                        id="contactMessage"
-                        placeholder="Write a message to send to freelancers..."
-                        value={contactMessage}
-                        onChange={(e) => setContactMessage(e.target.value)}
-                        className="mt-2 min-h-[100px]"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Existing Proposals */}
               {proposals.length > 0 && (
                 <Card>
@@ -392,19 +358,25 @@ const ProjectDetails = () => {
                                   Submitted {new Date(proposal.created_at).toLocaleDateString()}
                                 </div>
                                 <div className="flex gap-2">
-                                  {/* Contact button for project owner */}
-                                  {isProjectOwner && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleContactFreelancer(
-                                        proposal.profiles?.email || '', 
-                                        `${proposal.profiles?.first_name} ${proposal.profiles?.last_name}`
-                                      )}
-                                    >
-                                      <MessageSquare className="h-4 w-4 mr-1" />
-                                      Contact
-                                    </Button>
+                                  {/* Chat button for project owner */}
+                                  {isProjectOwner && user && (
+                                    <ChatDialog
+                                      projectId={id!}
+                                      receiverId={proposal.freelancer_id}
+                                      receiverName={`${proposal.profiles?.first_name} ${proposal.profiles?.last_name}`}
+                                      receiverAvatar={proposal.profiles?.avatar_url}
+                                      triggerText="Chat"
+                                    />
+                                  )}
+                                  {/* Chat button for freelancer to contact client */}
+                                  {user?.id === proposal.freelancer_id && (
+                                    <ChatDialog
+                                      projectId={id!}
+                                      receiverId={project.client_id}
+                                      receiverName={`${project.profiles?.first_name} ${project.profiles?.last_name}`}
+                                      receiverAvatar={project.profiles?.avatar_url}
+                                      triggerText="Chat with Client"
+                                    />
                                   )}
                                   {/* Delete button for proposal owner */}
                                   {user?.id === proposal.freelancer_id && (
