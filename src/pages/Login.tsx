@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -88,7 +87,7 @@ const Login = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleForgotPassword} className="space-y-4">
-                <div class="space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="resetEmail">Email Address</Label>
                   <div className="relative">
                     <Mail className={`absolute top-3 h-4 w-4 text-gray-400 ${isRTL ? 'right-3' : 'left-3'}`} />
