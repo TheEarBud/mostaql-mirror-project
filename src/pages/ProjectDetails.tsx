@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send, Trash2 } from 'lucide-react';
+import { MapPin, Clock, DollarSign, Users, Calendar, Star, Send, Trash2, CreditCard, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -17,15 +17,40 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useProposals, useCreateProposal } from '@/hooks/useProposals';
 import ChatDialog from '@/components/ChatDialog';
+import PaymentButton from '@/components/PaymentButton';
+import ProjectMilestones from '@/components/ProjectMilestones';
 
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [bidAmount, setBidAmount] = useState('');
   const [bidDescription, setBidDescription] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
+
+  // Check for payment status in URL params
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus === 'success') {
+      toast.success('Payment successful! Your project is now live.');
+      // Verify payment
+      if (id) {
+        supabase.functions.invoke('verify-payment', {
+          body: { projectId: id }
+        }).then(({ data, error }) => {
+          if (error) {
+            toast.error('Payment verification failed');
+          } else if (data.success) {
+            queryClient.invalidateQueries({ queryKey: ['project', id] });
+          }
+        });
+      }
+    } else if (paymentStatus === 'cancelled') {
+      toast.error('Payment was cancelled');
+    }
+  }, [searchParams, id, queryClient]);
 
   // Fetch project details
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -49,6 +74,23 @@ const ProjectDetails = () => {
       if (error) throw error;
       return data;
     }
+  });
+
+  // Check payment status
+  const { data: paymentInfo } = useQuery({
+    queryKey: ['project-payment', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from('project_payments')
+        .select('*')
+        .eq('project_id', id)
+        .maybeSingle();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: !!id
   });
 
   // Use the proposals hook
@@ -104,6 +146,12 @@ const ProjectDetails = () => {
 
     if (!bidAmount || !bidDescription || !deliveryTime) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Check if project is paid
+    if (project?.payment_status !== 'paid') {
+      toast.error('This project payment is still pending. Proposals can only be submitted to paid projects.');
       return;
     }
 
@@ -167,6 +215,7 @@ const ProjectDetails = () => {
     : 'Budget not specified';
 
   const isProjectOwner = user?.id === project.client_id;
+  const isProjectPaid = project.payment_status === 'paid';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -177,12 +226,45 @@ const ProjectDetails = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Payment Status Banner */}
+              {isProjectOwner && !isProjectPaid && (
+                <Card className="border-yellow-200 bg-yellow-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-yellow-800">Payment Required</h3>
+                        <p className="text-yellow-700">
+                          Complete the escrow payment to make your project live and start receiving proposals.
+                        </p>
+                      </div>
+                      <PaymentButton 
+                        projectId={project.id}
+                        amount={project.budget_min || 0}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Project Header */}
               <Card>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="text-2xl mb-2">{project.title}</CardTitle>
+                      <div className="flex items-center gap-2 mb-2">
+                        <CardTitle className="text-2xl">{project.title}</CardTitle>
+                        {isProjectPaid && (
+                          <Badge variant="default" className="bg-green-600">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Paid & Live
+                          </Badge>
+                        )}
+                        {!isProjectPaid && (
+                          <Badge variant="secondary">
+                            Payment Pending
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-6 text-sm text-gray-600 mb-4">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4" />
@@ -207,7 +289,7 @@ const ProjectDetails = () => {
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{project.category}</Badge>
                       {/* Chat button for freelancers to contact project owner */}
-                      {user && !isProjectOwner && (
+                      {user && !isProjectOwner && isProjectPaid && (
                         <ChatDialog
                           projectId={id!}
                           receiverId={project.client_id}
@@ -270,68 +352,76 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
 
-              {/* Submit Proposal - only show if not project owner */}
+              {/* Submit Proposal - only show if not project owner and project is paid */}
               {user && !isProjectOwner && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Submit a Proposal</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={handleSubmitProposal} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!isProjectPaid ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-600">
+                          This project is pending payment. Proposals can only be submitted once the client completes the escrow payment.
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmitProposal} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="bidAmount">Your Bid Amount ($)</Label>
+                            <Input
+                              id="bidAmount"
+                              type="number"
+                              placeholder="Enter your bid"
+                              value={bidAmount}
+                              onChange={(e) => setBidAmount(e.target.value)}
+                              className="mt-2"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="deliveryTime">Delivery Time (days)</Label>
+                            <Input
+                              id="deliveryTime"
+                              type="number"
+                              placeholder="e.g., 30"
+                              value={deliveryTime}
+                              onChange={(e) => setDeliveryTime(e.target.value)}
+                              className="mt-2"
+                              required
+                            />
+                          </div>
+                        </div>
+                        
                         <div>
-                          <Label htmlFor="bidAmount">Your Bid Amount ($)</Label>
-                          <Input
-                            id="bidAmount"
-                            type="number"
-                            placeholder="Enter your bid"
-                            value={bidAmount}
-                            onChange={(e) => setBidAmount(e.target.value)}
-                            className="mt-2"
+                          <Label htmlFor="bidDescription">Cover Letter</Label>
+                          <Textarea
+                            id="bidDescription"
+                            placeholder="Describe your approach, experience, and why you're the best fit for this project..."
+                            value={bidDescription}
+                            onChange={(e) => setBidDescription(e.target.value)}
+                            className="mt-2 min-h-[120px]"
                             required
                           />
                         </div>
-                        <div>
-                          <Label htmlFor="deliveryTime">Delivery Time (days)</Label>
-                          <Input
-                            id="deliveryTime"
-                            type="number"
-                            placeholder="e.g., 30"
-                            value={deliveryTime}
-                            onChange={(e) => setDeliveryTime(e.target.value)}
-                            className="mt-2"
-                            required
-                          />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="bidDescription">Cover Letter</Label>
-                        <Textarea
-                          id="bidDescription"
-                          placeholder="Describe your approach, experience, and why you're the best fit for this project..."
-                          value={bidDescription}
-                          onChange={(e) => setBidDescription(e.target.value)}
-                          className="mt-2 min-h-[120px]"
-                          required
-                        />
-                      </div>
-                      
-                      <Button 
-                        type="submit" 
-                        className="bg-blue-600 hover:bg-blue-700"
-                        disabled={createProposalMutation.isPending}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        {createProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
-                      </Button>
-                    </form>
+                        
+                        <Button 
+                          type="submit" 
+                          className="bg-blue-600 hover:bg-blue-700"
+                          disabled={createProposalMutation.isPending}
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          {createProposalMutation.isPending ? 'Submitting...' : 'Submit Proposal'}
+                        </Button>
+                      </form>
+                    )}
                   </CardContent>
                 </Card>
               )}
 
-              {/* Existing Proposals */}
-              {proposals.length > 0 && (
+              {/* Existing Proposals - only show if project is paid */}
+              {isProjectPaid && proposals.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Proposals ({proposals.length})</CardTitle>
@@ -413,6 +503,15 @@ const ProjectDetails = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Project Milestones - only show if project is paid */}
+              {isProjectPaid && (
+                <ProjectMilestones 
+                  projectId={id!}
+                  isClient={isProjectOwner}
+                  freelancerId={proposals.length > 0 ? proposals[0]?.freelancer_id : undefined}
+                />
+              )}
             </div>
 
             {/* Sidebar */}
@@ -459,12 +558,36 @@ const ProjectDetails = () => {
                   <CardContent>
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
+                        <span className="text-gray-600">Status</span>
+                        <span className={`font-semibold ${isProjectPaid ? 'text-green-600' : 'text-yellow-600'}`}>
+                          {isProjectPaid ? 'Live' : 'Pending Payment'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-gray-600">Proposals</span>
                         <span className="font-semibold">{proposals.length}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Posted</span>
                         <span>{new Date(project.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Escrow Protection Info */}
+                <Card className="border-green-200 bg-green-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-green-800">Escrow Protected</h4>
+                        <p className="text-sm text-green-700">
+                          {isProjectPaid ? 
+                            `$${project.budget_min} is securely held in escrow and will be released upon project completion.` :
+                            'This project will be protected by escrow payment upon client payment.'
+                          }
+                        </p>
                       </div>
                     </div>
                   </CardContent>

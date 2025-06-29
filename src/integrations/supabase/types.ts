@@ -9,6 +9,102 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      escrow_transactions: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          freelancer_id: string
+          id: string
+          project_id: string
+          status: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          freelancer_id: string
+          id?: string
+          project_id: string
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          freelancer_id?: string
+          id?: string
+          project_id?: string
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escrow_transactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_transactions_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      freelancer_balances: {
+        Row: {
+          available_balance: number
+          created_at: string
+          freelancer_id: string
+          id: string
+          pending_balance: number
+          total_earned: number
+          updated_at: string
+        }
+        Insert: {
+          available_balance?: number
+          created_at?: string
+          freelancer_id: string
+          id?: string
+          pending_balance?: number
+          total_earned?: number
+          updated_at?: string
+        }
+        Update: {
+          available_balance?: number
+          created_at?: string
+          freelancer_id?: string
+          id?: string
+          pending_balance?: number
+          total_earned?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freelancer_balances_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -55,6 +151,50 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_requests: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          created_at: string
+          freelancer_id: string
+          id: string
+          payment_details: Json
+          payment_method: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          created_at?: string
+          freelancer_id: string
+          id?: string
+          payment_details: Json
+          payment_method: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          created_at?: string
+          freelancer_id?: string
+          id?: string
+          payment_details?: Json
+          payment_method?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_requests_freelancer_id_fkey"
+            columns: ["freelancer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -112,6 +252,117 @@ export type Database = {
         }
         Relationships: []
       }
+      project_milestones: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          client_feedback: string | null
+          created_at: string
+          description: string | null
+          freelancer_id: string
+          id: string
+          project_id: string
+          status: string | null
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          client_feedback?: string | null
+          created_at?: string
+          description?: string | null
+          freelancer_id: string
+          id?: string
+          project_id: string
+          status?: string | null
+          submitted_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          client_feedback?: string | null
+          created_at?: string
+          description?: string | null
+          freelancer_id?: string
+          id?: string
+          project_id?: string
+          status?: string | null
+          submitted_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_payments: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          id: string
+          paid_at: string | null
+          payment_status: string | null
+          project_id: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          payment_status?: string | null
+          project_id: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          payment_status?: string | null
+          project_id?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           budget_max: number | null
@@ -122,6 +373,8 @@ export type Database = {
           deadline: string | null
           description: string
           id: string
+          payment_required: boolean | null
+          payment_status: string | null
           project_type: string | null
           skills_required: string[] | null
           status: string | null
@@ -137,6 +390,8 @@ export type Database = {
           deadline?: string | null
           description: string
           id?: string
+          payment_required?: boolean | null
+          payment_status?: string | null
           project_type?: string | null
           skills_required?: string[] | null
           status?: string | null
@@ -152,6 +407,8 @@ export type Database = {
           deadline?: string | null
           description?: string
           id?: string
+          payment_required?: boolean | null
+          payment_status?: string | null
           project_type?: string | null
           skills_required?: string[] | null
           status?: string | null
