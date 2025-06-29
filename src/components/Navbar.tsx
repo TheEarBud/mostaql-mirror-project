@@ -19,6 +19,14 @@ const Navbar = () => {
     navigate('/');
   };
 
+  const handleMessagesClick = () => {
+    if (user) {
+      navigate('/messages');
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
     <nav className={`fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50 ${isRTL ? 'rtl' : 'ltr'}`}>
       <div className="max-w-6xl mx-auto px-4 py-4">
@@ -48,7 +56,12 @@ const Navbar = () => {
                 <Button variant="ghost" size="sm" className="hidden md:flex">
                   <Bell className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="hidden md:flex">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="hidden md:flex"
+                  onClick={handleMessagesClick}
+                >
                   <MessageSquare className="h-4 w-4" />
                 </Button>
                 <Link to="/profile">
@@ -112,6 +125,19 @@ const Navbar = () => {
               >
                 {t('nav.postProject')}
               </Link>
+              {user && (
+                <Button 
+                  variant="ghost" 
+                  className="justify-start py-2"
+                  onClick={() => {
+                    handleMessagesClick();
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Messages
+                </Button>
+              )}
             </div>
           </div>
         )}

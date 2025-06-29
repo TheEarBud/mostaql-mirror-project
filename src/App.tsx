@@ -14,6 +14,7 @@ import PostProject from "./pages/PostProject";
 import FreelancersPage from "./pages/FreelancersPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProjectDetails from "./pages/ProjectDetails";
+import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/freelancers" element={<FreelancersPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/project/:id" element={<ProjectDetails />} />
+              <Route path="/messages" element={<Messages />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

@@ -1,15 +1,45 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Search, FileText, Users, CheckCircle, Star, TrendingUp } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { t, isRTL } = useLanguage();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Fetch user profile to determine user type
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('id', user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  const handleGetStarted = () => {
+    if (!user) {
+      navigate('/register');
+    } else if (profile?.user_type === 'employer') {
+      navigate('/post-project');
+    } else {
+      navigate('/projects');
+    }
+  };
 
   return (
     <div className={`min-h-screen ${isRTL ? 'rtl' : 'ltr'}`}>
@@ -25,11 +55,13 @@ const Index = () => {
             {t('home.subtitle')}
           </p>
           <div className={`flex flex-col sm:flex-row gap-4 justify-center ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
-            <Link to="/register">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3">
-                {t('home.getStarted')}
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+              onClick={handleGetStarted}
+            >
+              {t('home.getStarted')}
+            </Button>
             <Link to="/projects">
               <Button size="lg" variant="outline" className="text-lg px-8 py-3">
                 {t('nav.browseProjects')}
@@ -111,11 +143,13 @@ const Index = () => {
             Join thousands of satisfied clients and freelancers
           </p>
           <div className={`flex flex-col sm:flex-row gap-4 justify-center ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
-            <Link to="/register">
-              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3">
-                {t('nav.signup')}
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
+              onClick={handleGetStarted}
+            >
+              {t('nav.signup')}
+            </Button>
             <Link to="/post-project">
               <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-600 text-lg px-8 py-3">
                 {t('nav.postProject')}
