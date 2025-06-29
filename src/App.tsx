@@ -9,6 +9,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import Projects from "./pages/Projects";
 import PostProject from "./pages/PostProject";
 import FreelancersPage from "./pages/FreelancersPage";
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/post-project" element={<PostProject />} />
               <Route path="/freelancers" element={<FreelancersPage />} />
