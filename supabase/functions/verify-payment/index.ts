@@ -14,7 +14,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting payment verification process");
+    
     const { projectId } = await req.json();
+    console.log("Verifying payment for project:", projectId);
     
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -22,46 +25,60 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      throw new Error("STRIPE_SECRET_KEY not configured");
+    }
+
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
     });
 
     // Get payment record
-    const { data: payment } = await supabaseClient
+    const { data: payment, error: paymentError } = await supabaseClient
       .from("project_payments")
       .select("*")
       .eq("project_id", projectId)
       .single();
 
-    if (!payment?.stripe_payment_intent_id) {
+    if (paymentError || !payment) {
+      console.error("Payment record not found:", paymentError);
       throw new Error("Payment record not found");
     }
 
-    // Verify payment with Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent_id);
-    
-    if (paymentIntent.status === "succeeded") {
+    if (!payment.stripe_payment_intent_id) {
+      throw new Error("No Stripe session ID found");
+    }
+
+    console.log("Found payment record with session ID:", payment.stripe_payment_intent_id);
+
+    // Since we're storing session ID, we need to retrieve the session and then the payment intent
+    const session = await stripe.checkout.sessions.retrieve(payment.stripe_payment_intent_id);
+    console.log("Retrieved session:", session.id, "Status:", session.payment_status);
+
+    if (session.payment_status === "paid") {
+      console.log("Payment is successful, updating records");
+      
       // Update payment status
       await supabaseClient
         .from("project_payments")
         .update({ 
           payment_status: 'paid', 
-          paid_at: new Date().toISOString() 
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq("project_id", projectId);
 
       // Update project status
       await supabaseClient
         .from("projects")
-        .update({ payment_status: 'paid' })
+        .update({ 
+          payment_status: 'paid',
+          updated_at: new Date().toISOString()
+        })
         .eq("id", projectId);
 
-      // Create escrow transaction
-      const { data: project } = await supabaseClient
-        .from("projects")
-        .select("client_id")
-        .eq("id", projectId)
-        .single();
+      console.log("Payment verification completed successfully");
 
       return new Response(JSON.stringify({ 
         success: true, 
@@ -72,15 +89,21 @@ serve(async (req) => {
       });
     }
 
+    console.log("Payment not yet completed, status:", session.payment_status);
+
     return new Response(JSON.stringify({ 
       success: false, 
-      payment_status: paymentIntent.status 
+      payment_status: session.payment_status || 'pending'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Payment verification error:", error);
+    return new Response(JSON.stringify({ 
+      error: error.message || "Payment verification failed",
+      details: error.toString()
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
