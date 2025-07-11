@@ -151,7 +151,11 @@ const Index = () => {
               {t('nav.signup')}
             </Button>
             <Link to="/post-project">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-600 text-lg px-8 py-3">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="border-white text-white hover:bg-white hover:text-blue-600 text-lg px-8 py-3"
+              >
                 {t('nav.postProject')}
               </Button>
             </Link>

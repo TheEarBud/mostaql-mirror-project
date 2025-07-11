@@ -12,11 +12,6 @@ const Footer = () => {
             <p className="text-gray-400 mb-4">
               The world's largest freelancing and crowdsourcing marketplace.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">Facebook</a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">Twitter</a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">LinkedIn</a>
-            </div>
           </div>
           
           <div>
@@ -24,7 +19,7 @@ const Footer = () => {
             <ul className="space-y-2 text-gray-400">
               <li><Link to="/post-project" className="hover:text-white transition-colors">Post a Project</Link></li>
               <li><Link to="/freelancers" className="hover:text-white transition-colors">Find Freelancers</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">How it Works</a></li>
+              <li><Link to="/help-center" className="hover:text-white transition-colors">How it Works</Link></li>
             </ul>
           </div>
           
@@ -33,17 +28,17 @@ const Footer = () => {
             <ul className="space-y-2 text-gray-400">
               <li><Link to="/projects" className="hover:text-white transition-colors">Browse Projects</Link></li>
               <li><Link to="/register" className="hover:text-white transition-colors">Create Account</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">Success Stories</a></li>
+              <li><Link to="/help-center" className="hover:text-white transition-colors">Success Stories</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><Link to="/help-center" className="hover:text-white transition-colors">Help Center</Link></li>
+              <li><Link to="/contact-us" className="hover:text-white transition-colors">Contact Us</Link></li>
+              <li><Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>

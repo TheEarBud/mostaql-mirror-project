@@ -16,6 +16,10 @@ import FreelancersPage from "./pages/FreelancersPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProjectDetails from "./pages/ProjectDetails";
 import Messages from "./pages/Messages";
+import HelpCenter from "./pages/HelpCenter";
+import ContactUs from "./pages/ContactUs";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +43,10 @@ const App = () => (
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/project/:id" element={<ProjectDetails />} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/contact-us" element={<ContactUs />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
